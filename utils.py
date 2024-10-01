@@ -3,6 +3,7 @@ import torch
 import os
 import h5py
 from torch.utils.data import TensorDataset, DataLoader
+from bimanual_dataset import BimanualDataset
 
 import IPython
 e = IPython.embed
@@ -108,7 +109,7 @@ def get_norm_stats(dataset_dir, num_episodes):
     return stats
 
 
-def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val):
+def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val, dataset_name=None):
     print(f'\nData from: {dataset_dir}\n')
     # obtain train test split
     train_ratio = 0.8
@@ -116,12 +117,17 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
     train_indices = shuffled_indices[:int(train_ratio * num_episodes)]
     val_indices = shuffled_indices[int(train_ratio * num_episodes):]
 
-    # obtain normalization stats for qpos and action
-    norm_stats = get_norm_stats(dataset_dir, num_episodes)
-
     # construct dataset and dataloader
-    train_dataset = EpisodicDataset(train_indices, dataset_dir, camera_names, norm_stats)
-    val_dataset = EpisodicDataset(val_indices, dataset_dir, camera_names, norm_stats)
+    if dataset_name == 'bimanual':
+        norm_stats = {}
+        train_dataset = BimanualDataset()
+        val_dataset = BimanualDataset()
+        train_dataset.is_sim = True
+    else:
+        # obtain normalization stats for qpos and action
+        norm_stats = get_norm_stats(dataset_dir, num_episodes)
+        train_dataset = EpisodicDataset(train_indices, dataset_dir, camera_names, norm_stats)
+        val_dataset = EpisodicDataset(val_indices, dataset_dir, camera_names, norm_stats)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
 

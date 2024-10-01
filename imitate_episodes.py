@@ -34,7 +34,7 @@ def main(args):
     num_epochs = args['num_epochs']
 
     # get task parameters
-    is_sim = task_name[:4] == 'sim_'
+    is_sim = task_name[:4] == 'sim_' or task_name == 'bimanual'
     if is_sim:
         from constants import SIM_TASK_CONFIGS
         task_config = SIM_TASK_CONFIGS[task_name]
@@ -47,7 +47,7 @@ def main(args):
     camera_names = task_config['camera_names']
 
     # fixed parameters
-    state_dim = 14
+    state_dim = 24 if task_name == 'bimanual' else 14
     lr_backbone = 1e-5
     backbone = 'resnet18'
     if policy_class == 'ACT':
@@ -65,6 +65,7 @@ def main(args):
                          'dec_layers': dec_layers,
                          'nheads': nheads,
                          'camera_names': camera_names,
+                         'state_dim': state_dim,
                          }
     elif policy_class == 'CNNMLP':
         policy_config = {'lr': args['lr'], 'lr_backbone': lr_backbone, 'backbone' : backbone, 'num_queries': 1,
@@ -100,7 +101,8 @@ def main(args):
         print()
         exit()
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val)
+    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, num_episodes, camera_names, batch_size_train,
+                                                           batch_size_val, task_name)
 
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
@@ -338,25 +340,25 @@ def train_bc(train_dataloader, val_dataloader, config):
     best_ckpt_info = None
     for epoch in tqdm(range(num_epochs)):
         print(f'\nEpoch {epoch}')
-        # validation
-        with torch.inference_mode():
-            policy.eval()
-            epoch_dicts = []
-            for batch_idx, data in enumerate(val_dataloader):
-                forward_dict = forward_pass(data, policy)
-                epoch_dicts.append(forward_dict)
-            epoch_summary = compute_dict_mean(epoch_dicts)
-            validation_history.append(epoch_summary)
-
-            epoch_val_loss = epoch_summary['loss']
-            if epoch_val_loss < min_val_loss:
-                min_val_loss = epoch_val_loss
-                best_ckpt_info = (epoch, min_val_loss, deepcopy(policy.state_dict()))
-        print(f'Val loss:   {epoch_val_loss:.5f}')
-        summary_string = ''
-        for k, v in epoch_summary.items():
-            summary_string += f'{k}: {v.item():.3f} '
-        print(summary_string)
+        # # validation
+        # with torch.inference_mode():
+        #     policy.eval()
+        #     epoch_dicts = []
+        #     for batch_idx, data in enumerate(val_dataloader):
+        #         forward_dict = forward_pass(data, policy)
+        #         epoch_dicts.append(forward_dict)
+        #     epoch_summary = compute_dict_mean(epoch_dicts)
+        #     validation_history.append(epoch_summary)
+        #
+        #     epoch_val_loss = epoch_summary['loss']
+        #     if epoch_val_loss < min_val_loss:
+        #         min_val_loss = epoch_val_loss
+        #         best_ckpt_info = (epoch, min_val_loss, deepcopy(policy.state_dict()))
+        # print(f'Val loss:   {epoch_val_loss:.5f}')
+        # summary_string = ''
+        # for k, v in epoch_summary.items():
+        #     summary_string += f'{k}: {v.item():.3f} '
+        # print(summary_string)
 
         # training
         policy.train()
@@ -377,7 +379,7 @@ def train_bc(train_dataloader, val_dataloader, config):
             summary_string += f'{k}: {v.item():.3f} '
         print(summary_string)
 
-        if epoch % 100 == 0:
+        if epoch % 10 == 0:
             ckpt_path = os.path.join(ckpt_dir, f'policy_epoch_{epoch}_seed_{seed}.ckpt')
             torch.save(policy.state_dict(), ckpt_path)
             plot_history(train_history, validation_history, epoch, ckpt_dir, seed)

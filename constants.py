@@ -1,11 +1,18 @@
 import pathlib
 
 ### Task parameters
-DATA_DIR = '<put your data dir here>'
+DATA_DIR = 'data'
 SIM_TASK_CONFIGS = {
+    'bimanual':{
+        'dataset_dir': '',
+        'num_episodes': 1000,
+        'episode_len': 400,
+        'camera_names': ['rgb_left', 'rgb_head', 'rgb_right']
+    },
+
     'sim_transfer_cube_scripted':{
         'dataset_dir': DATA_DIR + '/sim_transfer_cube_scripted',
-        'num_episodes': 50,
+        'num_episodes': 10,
         'episode_len': 400,
         'camera_names': ['top']
     },
